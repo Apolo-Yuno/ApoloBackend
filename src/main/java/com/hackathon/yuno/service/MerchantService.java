@@ -4,6 +4,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.hackathon.yuno.exceptions.MerchantNotFound;
+import com.hackathon.yuno.mapper.MerchantMapper;
+import com.hackathon.yuno.model.dto.request.MerchantRequestDTO;
+import com.hackathon.yuno.model.dto.response.MerchantResponseDTO;
+import com.hackathon.yuno.model.entity.Merchant;
+import com.hackathon.yuno.model.enums.LifeCicleState;
+import com.hackathon.yuno.repository.MerchantRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -20,7 +26,7 @@ public class MerchantService {
         
         Merchant newMerchant = merchantMapper.toEntity(merchant);
 
-        Merchant merchantToSave = merchantRepsitory.save(newMerchant);
+        Merchant merchantToSave = merchantRepository.save(newMerchant);
 
         return merchantMapper.toDto(merchantToSave);
 

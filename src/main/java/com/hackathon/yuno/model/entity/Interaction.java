@@ -1,14 +1,13 @@
 package com.hackathon.yuno.model.entity;
 
-import lombok.Data;
-
 import java.time.LocalDateTime;
 
-import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import com.hackathon.yuno.model.enums.InteractionType;
-import com.hackathon.yuno.model.enums.PaymentMethod;
+
+import lombok.Data;
 
 @Data
 @Document(collection = "interactions")
