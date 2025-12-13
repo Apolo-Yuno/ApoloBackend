@@ -1,6 +1,6 @@
 package com.hackathon.yuno.model.dto.response;
 
-import com.hackathon.yuno.model.entity.MerchantContext; 
+import com.hackathon.yuno.model.entity.MerchantContext;
 import com.hackathon.yuno.model.enums.LifeCicleState;
 
 import lombok.AllArgsConstructor;

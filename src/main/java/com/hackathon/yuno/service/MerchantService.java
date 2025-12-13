@@ -20,9 +20,11 @@ import com.hackathon.yuno.repository.InteractionRepository;
 import com.hackathon.yuno.repository.MerchantRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class MerchantService {
     
     private final MerchantRepository merchantRepository;
@@ -42,9 +44,33 @@ public class MerchantService {
 
         AIAnalysisResult aiResult = aiService.analyze(request.getContent());
 
+        log.info("========== AI RESULT IN MERCHANT SERVICE ==========");
+        log.info("AIResult Name: {}", aiResult.getName());
+        log.info("AIResult State: {}", aiResult.getState());
+        log.info("AIResult Context is null: {}", aiResult.getContext() == null);
+        if (aiResult.getContext() != null) {
+            log.info("AIResult Context Countries: {}", aiResult.getContext().getCountries());
+            log.info("AIResult Context PaymentMethods: {}", aiResult.getContext().getPaymentMethods());
+            log.info("AIResult Context Providers: {}", aiResult.getContext().getProviders());
+        }
+        log.info("===================================================");
 
-        Merchant merchant = merchantRepository.findByName(aiResult.getName())
-                .orElseGet(() -> createNewMerchant(aiResult.getName()));
+        String merchantName;
+        System.out.println(request.getMerchantName());
+        System.out.println("FUNCIONAAAAA");
+        System.out.println("FUNCIONAAAAAAAAA");
+
+        
+
+        if (request.getMerchantName() != null && !request.getMerchantName().isEmpty()) {
+            merchantName = request.getMerchantName();
+        } else {
+            merchantName = aiResult.getName() != null ? aiResult.getName() : "Unknown Merchant";
+        }
+
+        String finalMerchantName = merchantName;
+        Merchant merchant = merchantRepository.findByName(finalMerchantName)
+            .orElseGet(() -> createNewMerchant(finalMerchantName));
 
         updateMerchantContext(merchant, aiResult);
         

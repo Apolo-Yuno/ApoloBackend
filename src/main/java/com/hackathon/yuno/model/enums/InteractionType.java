@@ -2,7 +2,7 @@ package com.hackathon.yuno.model.enums;
 
 public enum InteractionType {
     EMAIL,
-    SLACK,
+    NOTE,
     CALL,
-    FILES
+    CONTRACT
 }

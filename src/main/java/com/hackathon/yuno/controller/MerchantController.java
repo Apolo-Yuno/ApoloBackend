@@ -17,5 +17,4 @@ public class MerchantController {
     public MerchantResponseDTO ingestData(@RequestBody IngestRequestDTO request) {
         return merchantService.ingestData(request);
     }
-    
 }

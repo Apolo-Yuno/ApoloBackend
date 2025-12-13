@@ -4,5 +4,6 @@ public enum LifeCicleState {
     SALES,
     SUPPORT,
     INTEGRATION,
-    LIVE
+    LIVE,
+    CONTRACT
 }
