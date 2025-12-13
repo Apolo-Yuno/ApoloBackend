@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MerchantResponseDTO {
+public class IngestResponseDTO {
     private String id;
     private String name;
     private LifeCicleState lifeCicleState;

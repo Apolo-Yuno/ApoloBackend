@@ -1,21 +1,21 @@
 package com.hackathon.yuno.controller;
 
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
+import com.hackathon.yuno.model.dto.request.IngestRequestDTO;
 import com.hackathon.yuno.model.dto.response.MerchantResponseDTO;
+import com.hackathon.yuno.service.MerchantService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
 
-@RequestMapping ("/merchant")
+@RequestMapping("/merchant")
 @RestController
+@RequiredArgsConstructor
 public class MerchantController {
 
-    @PostMapping("")
-    public MerchantResponseDTO createMerchant(){
-        return null;
+    private final MerchantService merchantService;
 
+    @PostMapping("/ingest")
+    public MerchantResponseDTO ingestData(@RequestBody IngestRequestDTO request) {
+        return merchantService.ingestData(request);
     }
-
-
-
+    
 }
