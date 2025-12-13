@@ -1,4 +1,4 @@
-package com.hackathon.yuno.ApoloBackend;
+package com.hackathon.yuno;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
