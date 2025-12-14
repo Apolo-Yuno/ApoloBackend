@@ -19,20 +19,20 @@ This section illustrates the system architecture. The images are stored in `docs
 
 ### 🧩 General Component Diagram
 
-![General Component Diagram](docs/DiagramaDeArquitecturaGeneral.png)
+![General Component Diagram](docs/DiagramaArquitecturaGeneralF.png)
 
 This high-level architecture diagram outlines the core components of our solution. We leverage external APIs for AI capabilities and integrations with platforms such as Slack and email. A non-relational database is utilized to efficiently handle high data volumes and flexible data structures.
 
 ### ⚙️ Specific Component Diagram
 
-![Specific Component Diagram](docs/DiagramaDeComponentesEspecifico.png)
+![Specific Component Diagram](docs/DiagramaDeComponentesEspecificoF.png)
 
 This diagram details the specific services involved in the implementation. The central component is the Merchant Service, which orchestrates merchant creation, manages interactions, and coordinates calls to AI services.
 
 ### 🗄️ Database Model
 
 
-![Database Diagram](docs/DiagramaBaseDeDatos.png)
+![Database Diagram](docs/DiagramaDeBasesDeDatosF.png)
 
 Our data model is implemented using MongoDB to handle document-based storage. We utilize a combination of embedded and referenced documents to optimize performance and data integrity:
 
@@ -41,7 +41,7 @@ Our data model is implemented using MongoDB to handle document-based storage. We
 
 ### 📦 Class Diagram
 
-![Class Diagram](docs/DiagramaDeClases.png)
+![Class Diagram](docs/DiagramaDeClasesF.png)
 
 The class diagram illustrates the relationships between entities, enumerations, and the design patterns applied:
 
