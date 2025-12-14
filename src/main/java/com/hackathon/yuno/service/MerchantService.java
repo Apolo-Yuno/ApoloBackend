@@ -4,11 +4,13 @@ import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.hackathon.yuno.exceptions.MerchantNotFound;
 import com.hackathon.yuno.mapper.MerchantMapper;
 import com.hackathon.yuno.model.dto.ai.AIAnalysisResult;
 import com.hackathon.yuno.model.dto.request.IngestRequestDTO;
@@ -205,5 +207,17 @@ public class MerchantService {
             .build();
 
         return ingestData(request);
+    }
+
+    public MerchantResponseDTO getMerchantByName(String name) {
+        Merchant merchant = merchantRepository.findByName(name)
+                .orElseThrow(() -> new MerchantNotFound("Merchant not found with name: " + name));
+        return merchantMapper.toDto(merchant);
+    }
+
+    public List<MerchantResponseDTO> getAllMerchants() {
+        return merchantRepository.findAll().stream()
+                .map(merchantMapper::toDto)
+                .collect(Collectors.toList());
     }
 }
