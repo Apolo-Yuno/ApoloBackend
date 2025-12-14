@@ -61,31 +61,16 @@ public class MerchantService {
     @Transactional
     public MerchantResponseDTO ingestData(IngestRequestDTO request) {
 
-        Interaction interaction = new Interaction();
-        interaction.setContext(request.getContent());
-        interaction.setInteractionType(request.getType());
-        interaction.setInteractionDate(LocalDateTime.now());
+        Interaction interaction = Interaction.builder()
+        .context(request.getContent())
+        .interactionType(request.getType())
+        .interactionDate(LocalDateTime.now())
+        .build();
         interaction = interactionRepository.save(interaction);
 
         AIAnalysisResult aiResult = aiService.analyze(request.getContent());
 
-        log.info("========== AI RESULT IN MERCHANT SERVICE ==========");
-        log.info("AIResult Name: {}", aiResult.getName());
-        log.info("AIResult State: {}", aiResult.getState());
-        log.info("AIResult Context is null: {}", aiResult.getContext() == null);
-        if (aiResult.getContext() != null) {
-            log.info("AIResult Context Countries: {}", aiResult.getContext().getCountries());
-            log.info("AIResult Context PaymentMethods: {}", aiResult.getContext().getPaymentMethods());
-            log.info("AIResult Context Providers: {}", aiResult.getContext().getProviders());
-        }
-        log.info("===================================================");
-
         String merchantName;
-        System.out.println(request.getMerchantName());
-        System.out.println("FUNCIONAAAAA");
-        System.out.println("FUNCIONAAAAAAAAA");
-
-        
 
         if (request.getMerchantName() != null && !request.getMerchantName().isEmpty()) {
             merchantName = request.getMerchantName();
@@ -113,93 +98,65 @@ public class MerchantService {
 
 
     private Merchant createNewMerchant(String name) {
-        Merchant m = new Merchant();
-        m.setName(name);
-        m.setLifeCicleState(LifeCicleState.SALES);
-        m.setMerchantContext(new MerchantContext()); // Inicializar vacío
-        m.getMerchantContext().setCountries(new ArrayList<>());
-        m.getMerchantContext().setProviders(new ArrayList<>());
-        m.getMerchantContext().setPaymentMethods(new ArrayList<>());
-        return m;
+        Merchant newMerchant = Merchant.builder()
+        .name(name)
+        .lifeCicleState(LifeCicleState.SALES)
+        .merchantContext(MerchantContext.builder()
+            .countries(new ArrayList<>())
+            .providers(new ArrayList<>())
+            .paymentMethods(new ArrayList<>())
+            .build())   
+        .build();
+        
+        return newMerchant;
     }
 
     private void updateMerchantContext(Merchant merchant, AIAnalysisResult aiData) {
-        MerchantContext ctx = merchant.getMerchantContext();
-        if (ctx == null) { 
-             ctx = new MerchantContext(); 
-             merchant.setMerchantContext(ctx);
+        MerchantContext context = merchant.getMerchantContext();
+        if (context == null) { 
+             context = new MerchantContext(); 
+             merchant.setMerchantContext(context);
         }
         
         if (aiData.getContext() != null) {
             MerchantContext aiContext = aiData.getContext();
             
             if (aiContext.getCountries() != null) {
-                if (ctx.getCountries() == null) {
-                    ctx.setCountries(new ArrayList<>());
+                if (context.getCountries() == null) {
+                    context.setCountries(new ArrayList<>());
                 }
                 for (String c : aiContext.getCountries()) {
-                    if (!ctx.getCountries().contains(c)) ctx.getCountries().add(c);
+                    if (!context.getCountries().contains(c)) context.getCountries().add(c);
                 }
             }
 
             if (aiContext.getProviders() != null) {
-                if (ctx.getProviders() == null) {
-                    ctx.setProviders(new ArrayList<>());
+                if (context.getProviders() == null) {
+                    context.setProviders(new ArrayList<>());
                 }
                 for (String p : aiContext.getProviders()) {
-                    if (!ctx.getProviders().contains(p)) ctx.getProviders().add(p);
+                    if (!context.getProviders().contains(p)) context.getProviders().add(p);
                 }
             }
             
             if (aiContext.getPaymentMethods() != null) {
-                if (ctx.getPaymentMethods() == null) {
-                    ctx.setPaymentMethods(new ArrayList<>());
+                if (context.getPaymentMethods() == null) {
+                    context.setPaymentMethods(new ArrayList<>());
                 }
                 for (PaymentMethod pm : aiContext.getPaymentMethods()) {
-                    if (!ctx.getPaymentMethods().contains(pm)) {
-                        ctx.getPaymentMethods().add(pm);
+                    if (!context.getPaymentMethods().contains(pm)) {
+                        context.getPaymentMethods().add(pm);
                     }
                 }
             }
             
             if (aiContext.getRiskNotes() != null) {
-                ctx.setRiskNotes(aiContext.getRiskNotes());
+                context.setRiskNotes(aiContext.getRiskNotes());
             }
         }
         
         if (aiData.getSummary() != null) {
-            ctx.setLastSummary(aiData.getSummary());
+            context.setLastSummary(aiData.getSummary());
         }
-    }
-
-    @Transactional
-    public MerchantResponseDTO createMerchant(IngestRequestDTO merchant){
-        
-        Merchant newMerchant = merchantMapper.toEntity(merchant);
-
-        Merchant merchantToSave = merchantRepository.save(newMerchant);
-
-        return merchantMapper.toDto(merchantToSave);
-
-    }
-    
-    @Transactional
-    public MerchantResponseDTO getMerchantContext(String id){
-
-        Merchant merchant = merchantRepository.findById(id).orElseThrow(() -> new MerchantNotFound("The merchant with id: {id} not found"));
-        
-        return merchantMapper.toDto(merchant);
-
-    }
-
-    @Transactional
-    public MerchantResponseDTO updateLifyCycleState(String id, LifeCicleState state){
-
-        Merchant merchantToUpdate = merchantRepository.findById(id).orElseThrow(() -> new MerchantNotFound("Merchant with id: {id} not found "));
-
-        merchantToUpdate.setLifeCicleState(state);
-
-        return merchantMapper.toDto(merchantToUpdate);   
-
     }
 }

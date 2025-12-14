@@ -37,22 +37,28 @@ public class AIService {
 
 
     public AIAnalysisResult analyze(String rawText) {
-        System.out.println("========== ANALYZING TEXT ==========");
-        System.out.println("Input text: " + rawText);
-        System.out.println("API Key configured: " + (apiKey != null && !apiKey.isEmpty() && !apiKey.equals("your-api-key-here")));
-        System.out.println("====================================");
+        log.info("Analyzing text of length: {}", rawText != null ? rawText.length() : 0);
         try {
             return callGroq(rawText);
         } catch (Exception e) {
-            System.err.println("ERROR calling Groq: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Error calling Groq API", e);
             return new AIAnalysisResult(); 
         }
     }
 
-    @SuppressWarnings("unchecked")
     private AIAnalysisResult callGroq(String text) throws Exception {
-        String prompt = String.format("""
+        String prompt = createPrompt(text);
+        Map<String, Object> requestBody = buildRequestBody(prompt);
+        HttpEntity<Map<String, Object>> entity = buildRequestEntity(requestBody);
+
+        var response = restTemplate.postForEntity(GROQ_URL, entity, Map.class);
+        log.info("Groq response status: {}", response.getStatusCodeValue());
+
+        return parseResponse(response.getBody());
+    }
+
+    private String createPrompt(String text) {
+        return String.format("""
             Extrae información del siguiente mensaje de un merchant de pagos.
             
             MENSAJE: "%s"
@@ -80,7 +86,10 @@ public class AIService {
             Ejemplo para "Hola somos Zoop, queremos PSE en Colombia":
             {"name":"Zoop","state":"SALES","context":{"countries":["CO"],"paymentMethods":["PSE"],"providers":[],"riskNotes":null},"summary":"Zoop interesado en PSE Colombia"}
             """, text);
-            Map<String, Object> requestBody = Map.of(
+    }
+
+    private Map<String, Object> buildRequestBody(String prompt) {
+        return Map.of(
             "model", "llama-3.3-70b-versatile",
             "messages", List.of(
                 Map.of("role", "system", "content", "Eres un asistente experto en análisis de datos de merchants de pagos. Respondes ÚNICAMENTE con JSON válido, sin markdown ni explicaciones adicionales."),
@@ -88,135 +97,53 @@ public class AIService {
             ),
             "temperature", 0.0
         );
+    }
 
+    private HttpEntity<Map<String, Object>> buildRequestEntity(Map<String, Object> requestBody) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(apiKey);
+        return new HttpEntity<>(requestBody, headers);
+    }
 
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
-        var response = restTemplate.postForEntity(GROQ_URL, entity, Map.class);
-
-    log.info("Groq response status: {}", response.getStatusCodeValue());
-    Map<String, Object> body = response.getBody();
-    log.debug("Groq raw body object: {}", body);
+    @SuppressWarnings("unchecked")
+    private AIAnalysisResult parseResponse(Map<String, Object> body) {
         if (body == null) {
-            log.error("Groq response body is null");
+            log.warn("Groq response body is null");
             return new AIAnalysisResult();
         }
-        
+
+        String jsonString = extractContentFromChoices(body);
+        if (jsonString == null) {
+            return new AIAnalysisResult();
+        }
+
+        jsonString = jsonString.replace("```json", "").replace("```", "").trim();
+
+        try {
+            AIAnalysisResult result = objectMapper.readValue(jsonString, AIAnalysisResult.class);
+            log.info("Parsed AI result successfully: {}", result.getName());
+            return result;
+        } catch (Exception e) {
+            log.error("Failed to parse Groq response: {}", e.getMessage());
+            return new AIAnalysisResult();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private String extractContentFromChoices(Map<String, Object> body) {
         List<Map<String, Object>> choices = (List<Map<String, Object>>) body.get("choices");
         if (choices == null || choices.isEmpty()) {
-            log.error("Groq response has no choices");
-            return new AIAnalysisResult();
+            log.warn("Groq response has no choices");
+            return null;
         }
         
-        Object firstChoice = choices.get(0);
-        String jsonString = null;
-        if (firstChoice instanceof Map) {
-            Map<String, Object> fc = (Map<String, Object>) firstChoice;
-            Object messageObj = fc.get("message");
-            if (messageObj instanceof Map) {
-                jsonString = (String) ((Map<String, Object>) messageObj).get("content");
-            }
-            if (jsonString == null) {
-                jsonString = (String) fc.get("content");
-            }
-            if (jsonString == null) {
-                jsonString = (String) fc.get("text");
-            }
-        }
-        if (jsonString == null) {
-            log.error("Could not extract content from Groq response choices: {}", choices.get(0));
-            return new AIAnalysisResult();
-        }
+        Map<String, Object> firstChoice = choices.get(0);
+        Map<String, Object> message = (Map<String, Object>) firstChoice.get("message");
         
-        System.out.println("========== RAW GROQ RESPONSE ==========");
-        System.out.println(jsonString);
-        System.out.println("=======================================");
-        
-        jsonString = jsonString.replace("```json", "").replace("```", "").trim();
-        
-        System.out.println("========== CLEANED JSON ==========");
-        System.out.println(jsonString);
-        System.out.println("==================================");
-        
-        objectMapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS, true);
-        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        objectMapper.configure(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL, true);
-
-        AIAnalysisResult result = null;
-        try {
-            result = objectMapper.readValue(jsonString, AIAnalysisResult.class);
-        } catch (Exception e) {
-            log.warn("Direct binding to AIAnalysisResult failed, attempting fallback parsing: {}", e.toString());
+        if (message != null) {
+            return (String) message.get("content");
         }
-
-        if (result == null || result.getContext() == null || result.getName() == null) {
-            try {
-                Map<String, Object> parsed = objectMapper.readValue(jsonString, Map.class);
-                AIAnalysisResult fallback = new AIAnalysisResult();
-
-                Object n = parsed.getOrDefault("name", parsed.get("merchantName"));
-                fallback.setName(n != null ? n.toString() : null);
-
-                Object s = parsed.getOrDefault("state", parsed.get("suggestedState"));
-                if (s != null) {
-                    try {
-                        fallback.setState(LifeCicleState.valueOf(s.toString().toUpperCase()));
-                    } catch (Exception ex) {
-                    }
-                }
-
-                Object ctxObj = parsed.get("context");
-                MerchantContext ctx = new MerchantContext();
-                if (ctxObj instanceof Map) {
-                    Map<String, Object> c = (Map<String, Object>) ctxObj;
-                    Object countries = c.get("countries");
-                    if (countries instanceof Iterable) {
-                        for (Object co : (Iterable<?>) countries) {
-                            if (co != null) ctx.getCountries().add(co.toString());
-                        }
-                    }
-
-                    Object pms = c.get("paymentMethods");
-                    if (pms instanceof Iterable) {
-                        for (Object pm : (Iterable<?>) pms) {
-                            if (pm == null) continue;
-                            try {
-                                PaymentMethod enumPm = PaymentMethod.valueOf(pm.toString().toUpperCase());
-                                ctx.getPaymentMethods().add(enumPm);
-                            } catch (Exception ex) {
-                            }
-                        }
-                    }
-
-                    Object providers = c.get("providers");
-                    if (providers instanceof Iterable) {
-                        for (Object pr : (Iterable<?>) providers) {
-                            if (pr != null) ctx.getProviders().add(pr.toString());
-                        }
-                    }
-
-                    Object risk = c.get("riskNotes");
-                    if (risk != null) ctx.setRiskNotes(risk.toString());
-                }
-
-                fallback.setContext(ctx);
-
-                Object summary = parsed.get("summary");
-                if (summary != null) fallback.setSummary(summary.toString());
-
-                result = fallback;
-                log.info("Fallback parsed AI result: name={}, state={}, countries={}, pms={}, providers={}",
-                        result.getName(), result.getState(), result.getContext().getCountries(), result.getContext().getPaymentMethods(), result.getContext().getProviders());
-            } catch (Exception ex) {
-                log.error("Fallback parsing failed: {}", ex.toString());
-                if (result == null) result = new AIAnalysisResult();
-            }
-        }
-
-        log.info("Final parsed result - Name: {}, State: {}, Context null: {}", result.getName(), result.getState(), result.getContext() == null);
-        return result;
+        return null;
     }
 }
