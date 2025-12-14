@@ -7,9 +7,15 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import com.hackathon.yuno.model.enums.InteractionType;
 
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Document(collection = "interactions")
 public class Interaction {
 

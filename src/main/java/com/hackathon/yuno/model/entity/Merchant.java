@@ -8,8 +8,13 @@ import com.hackathon.yuno.model.enums.LifeCicleState;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 
+import lombok.Builder;
+import lombok.AllArgsConstructor;
+
 @Data
+@Builder    
 @RequiredArgsConstructor
+@AllArgsConstructor
 @Document(collection = "merchants")
 public class Merchant {
 
