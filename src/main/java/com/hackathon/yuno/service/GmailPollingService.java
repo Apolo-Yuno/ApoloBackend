@@ -29,10 +29,10 @@ public class GmailPollingService {
     @Value("${app.mail.bot.email}")
     private String botMail;
 
-    @Value("${app.mail.bot.email}")
+    @Value("${app.mail.bot.password}")
     private String botMailPassword;
 
-    @Scheduled(fixedDelay = 30000)
+    @Scheduled(fixedDelay = 5000)
     public void checkEmails(){
         Properties props = new Properties();
         props.put("mail.store.protocol", "imaps");
