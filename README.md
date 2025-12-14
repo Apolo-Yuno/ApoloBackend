@@ -107,6 +107,17 @@ java -Dopenai.api.key="$OPENAI_API_KEY" -Dgladia.api.key="$GLADIA_API_KEY" -Dspr
 
 ```
 
+
+## 🐳 Dockerization
+
+We rely on Docker to support our development process, making it more efficient and optimizing resource usage. This tool allows us to standardize our development environment and avoid the overhead of installing heavy dependencies locally.
+
+To start the services using Docker Compose:
+
+```bash
+docker-compose up -d
+```
+
 ### 🚀 Common Commands
 
 - Build (with tests)
