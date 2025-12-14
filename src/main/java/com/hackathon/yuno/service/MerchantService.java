@@ -1,5 +1,6 @@
 package com.hackathon.yuno.service;
 
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +34,7 @@ public class MerchantService {
     private final MerchantMapper merchantMapper;
     private final AIService aiService;
     private final InteractionRepository interactionRepository;
+    private final DocumentAnalizerService documentAnalizerService;
     private final GladiaService gladiaService;
 
     @Transactional
@@ -180,5 +182,28 @@ public class MerchantService {
                 currentRisk.setNotes(oldNotes + separator + newRisk.getNotes());
             }
         }
+    }
+
+    @Transactional
+    public MerchantResponseDTO proccessFromEmail(String senderEmail, String emailBody, InputStream attachmentStream){
+        
+        StringBuilder fullContent = new StringBuilder();
+        fullContent.append("EMAIL SENDER: ").append(senderEmail).append("\n");
+        fullContent.append("EMAIL BODY: \n").append(emailBody).append("\n");
+
+        if(attachmentStream != null){
+            String pdfText = documentAnalizerService.extractTextFromPDFStream(attachmentStream);
+            if(!pdfText.isEmpty()){
+                fullContent.append("\nATTACHMENT CONTENT: \n").append(pdfText);
+            }
+        }
+
+        IngestRequestDTO request = IngestRequestDTO.builder()
+            .content(fullContent.toString())
+            .type(InteractionType.EMAIL)
+            .merchantName(null)
+            .build();
+
+        return ingestData(request);
     }
 }
