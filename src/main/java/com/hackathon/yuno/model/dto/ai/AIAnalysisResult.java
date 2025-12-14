@@ -13,8 +13,10 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class AIAnalysisResult {
-    
+
     private String name;
+
+    private String contactPerson;
 
     private LifeCicleState state;
 

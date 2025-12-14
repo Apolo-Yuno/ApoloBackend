@@ -7,7 +7,7 @@ import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface InteractionMapper {
-    
-    List<InteractionResponseDTO> toDtoList(List<Interaction> interaction); 
+
+    List<InteractionResponseDTO> toDtoList(List<Interaction> interaction);
 
 }

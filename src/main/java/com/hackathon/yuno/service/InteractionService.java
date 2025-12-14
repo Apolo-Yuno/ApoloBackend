@@ -16,12 +16,12 @@ import com.hackathon.yuno.model.dto.response.InteractionResponseDTO;
 @Service
 @RequiredArgsConstructor
 public class InteractionService {
-    
+
     private final InteractionRepository interactionRepository;
     private final InteractionMapper interactionMapper;
 
     @Transactional
-    public List<InteractionResponseDTO> getAllInteractionsByMerchantId(String merchantId){
+    public List<InteractionResponseDTO> getAllInteractionsByMerchantId(String merchantId) {
 
         List<Interaction> interactions = interactionRepository.findAllByMerchantId(merchantId);
 
