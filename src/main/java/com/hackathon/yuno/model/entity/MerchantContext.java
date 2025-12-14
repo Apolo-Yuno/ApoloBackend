@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.hackathon.yuno.model.enums.PaymentMethod;
+import com.hackathon.yuno.model.entity.RiskProfile;
 
 import lombok.Builder;
 import lombok.Data;
@@ -15,13 +16,13 @@ import lombok.AllArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonIgnoreProperties(ignoreUnknown = true)
 public class MerchantContext {
 
     private List<String> countries = new ArrayList<>();
     private List<PaymentMethod> paymentMethods = new ArrayList<>();
     private List<String> providers = new ArrayList<>();
-    private String riskNotes;
+
+    private RiskProfile riskData;
     private String lastSummary;
 
 }

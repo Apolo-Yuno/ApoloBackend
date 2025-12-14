@@ -11,12 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.MapperFeature;
 import com.hackathon.yuno.model.dto.ai.AIAnalysisResult;
-import com.hackathon.yuno.model.entity.MerchantContext;
-import com.hackathon.yuno.model.enums.PaymentMethod;
-import com.hackathon.yuno.model.enums.LifeCicleState;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,16 +20,14 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Slf4j
 public class AIService {
-    
+
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-
     @Value("${openai.api.key}")
-    private String apiKey;    
+    private String apiKey;
 
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-
 
     public AIAnalysisResult analyze(String rawText) {
         log.info("Analyzing text of length: {}", rawText != null ? rawText.length() : 0);
@@ -42,7 +35,7 @@ public class AIService {
             return callGroq(rawText);
         } catch (Exception e) {
             log.error("Error calling Groq API", e);
-            return new AIAnalysisResult(); 
+            return new AIAnalysisResult();
         }
     }
 
@@ -58,45 +51,59 @@ public class AIService {
     }
 
     private String createPrompt(String text) {
-        return String.format("""
-            Extrae información del siguiente mensaje de un merchant de pagos.
-            
-            MENSAJE: "%s"
-            
-            Responde SOLO con este JSON (sin explicaciones, sin markdown):
-            {
-              "name": "nombre del merchant o Unknown Merchant si no hay",
-              "state": "uno de: SALES, CONTRACT, IMPLEMENTATION, LIVE",
-              "context": {
-                "countries": ["códigos ISO como CO, MX, etc o array vacío"],
-                "paymentMethods": ["uno o varios de: PSE, CREDITCARD, DEBITCARD, CASH o array vacío"],
-                "providers": ["STRIPE, ADYEN, etc en mayúsculas o array vacío"],
-                "riskNotes": "notas sobre límites/riesgo o null"
-              },
-              "summary": "resumen breve del mensaje"
-            }
-            
-            Reglas:
-            - state: SALES=interés inicial, CONTRACT=firma/legal/contrato, IMPLEMENTATION=integración técnica, LIVE=producción
-            - Si no hay nombre de merchant, usa "Unknown Merchant"
-            - Arrays vacíos si no hay info: []
-            - riskNotes null si no hay info de riesgo
-            - SIEMPRE incluye todas las claves
-            
-            Ejemplo para "Hola somos Zoop, queremos PSE en Colombia":
-            {"name":"Zoop","state":"SALES","context":{"countries":["CO"],"paymentMethods":["PSE"],"providers":[],"riskNotes":null},"summary":"Zoop interesado en PSE Colombia"}
-            """, text);
+        return String.format(
+                """
+                        Actúa como un Arquitecto de Soluciones de Pagos (Payment Gateway).
+                        Tu tarea es extraer datos estructurados de mensajes informales.
+
+                        MENSAJE A ANALIZAR: "%s"
+
+                        INSTRUCCIONES DE EXTRACCIÓN:
+                        1. Merchant Name: Identifica la EMPRESA, no la persona que escribe. Si dice "Soy Juan de Uber", el merchant es "Uber".
+                        2. State (Ciclo de Vida):
+                        - SALES: Preguntas comerciales, precios, "queremos saber", "interesados".
+                        - CONTRACT: Temas legales, firma, documentos, compliance.
+                        - IMPLEMENTATION: Credenciales, API Key, Sandbox, Dev, SDK, errores técnicos (404, 401).
+                        - LIVE: Salida a producción, tráfico real, go-live.
+                        *Regla*: Si hay conflicto, elige el estado más avanzado mencionado.
+                        3. Payment Methods: Mapea a ENUMS exactos:
+                        - "Tarjeta", "Visa", "Master" -> CREDITCARD
+                        - "PSE", "Transferencia" -> PSE
+                        - "Efectivo", "SuRed", "Baloto" -> CASH
+                        4. Risk & Limits:
+                        - Si mencionan montos (ej: "cupo de 50k", "límite de 20 millones"), extrae el número y la moneda.
+
+                        FORMATO DE RESPUESTA JSON (Estricto):
+                        {
+                        "name": "String (Nombre de empresa o 'Unknown')",
+                        "contactPerson": "String (Nombre de quien escribe o null)",
+                        "state": "ENUM",
+                        "context": {
+                            "countries": ["ISO_CODE_2_CHAR"],
+                            "paymentMethods": ["ENUM"],
+                            "providers": ["STRING_UPPERCASE"],
+                            "riskData": {
+                            "requestedLimit": Number (o null),
+                            "currency": "ISO_CODE_3_CHAR" (o null),
+                            "notes": "String con el contexto de riesgo"
+                            }
+                        },
+                        "summary": "Resumen ejecutivo corto"
+                        }
+
+                        IMPORTANTE: Responde SOLO el JSON. No uses markdown.
+                        """,
+                text);
     }
 
     private Map<String, Object> buildRequestBody(String prompt) {
         return Map.of(
-            "model", "llama-3.3-70b-versatile",
-            "messages", List.of(
-                Map.of("role", "system", "content", "Eres un asistente experto en análisis de datos de merchants de pagos. Respondes ÚNICAMENTE con JSON válido, sin markdown ni explicaciones adicionales."),
-                Map.of("role", "user", "content", prompt)
-            ),
-            "temperature", 0.0
-        );
+                "model", "llama-3.3-70b-versatile",
+                "messages", List.of(
+                        Map.of("role", "system", "content",
+                                "Eres un asistente experto en análisis de datos de merchants de pagos. Respondes ÚNICAMENTE con JSON válido, sin markdown ni explicaciones adicionales."),
+                        Map.of("role", "user", "content", prompt)),
+                "temperature", 0.0);
     }
 
     private HttpEntity<Map<String, Object>> buildRequestEntity(Map<String, Object> requestBody) {
@@ -137,10 +144,10 @@ public class AIService {
             log.warn("Groq response has no choices");
             return null;
         }
-        
+
         Map<String, Object> firstChoice = choices.get(0);
         Map<String, Object> message = (Map<String, Object>) firstChoice.get("message");
-        
+
         if (message != null) {
             return (String) message.get("content");
         }

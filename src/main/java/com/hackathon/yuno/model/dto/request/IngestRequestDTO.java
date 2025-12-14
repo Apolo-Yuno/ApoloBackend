@@ -13,6 +13,6 @@ import lombok.NoArgsConstructor;
 @Builder
 public class IngestRequestDTO {
     private String content;
-    private InteractionType type; 
+    private InteractionType type;
     private String merchantName;
 }
