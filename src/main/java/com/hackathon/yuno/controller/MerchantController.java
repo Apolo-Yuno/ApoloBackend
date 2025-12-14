@@ -15,6 +15,8 @@ import com.hackathon.yuno.service.MerchantService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.List;
+
 @RequestMapping("/merchant")
 @RestController
 @RequiredArgsConstructor
@@ -46,5 +48,15 @@ public class MerchantController {
             e.printStackTrace();
             throw new RuntimeException("Error procesando audio: " + e.getMessage());
         }
+    }
+
+    @GetMapping("/{name}")
+    public ResponseEntity<MerchantResponseDTO> getMerchantByName(@PathVariable String name) {
+        return ResponseEntity.ok(merchantService.getMerchantByName(name));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<MerchantResponseDTO>> getAllMerchants() {
+        return ResponseEntity.ok(merchantService.getAllMerchants());
     }
 }

@@ -2,6 +2,8 @@ package com.hackathon.yuno.service;
 
 import java.util.Properties;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -16,15 +18,17 @@ import jakarta.mail.Message;
 import jakarta.mail.Part;
 import jakarta.mail.Session;
 import jakarta.mail.Store;
+import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMultipart;
 import jakarta.mail.search.FlagTerm;
 
 @Service
 public class GmailPollingService {
 
-    @Autowired
-    public MerchantService merchantService;
+    private static final Logger log = LoggerFactory.getLogger(GmailPollingService.class);
 
+    @Autowired
+    private MerchantService merchantService;
 
     @Value("${app.mail.bot.email}")
     private String botMail;
@@ -32,70 +36,85 @@ public class GmailPollingService {
     @Value("${app.mail.bot.password}")
     private String botMailPassword;
 
-    @Scheduled(fixedDelay = 5000)
-    public void checkEmails(){
+    private static final String MAIL_PROTOCOL = "imaps";
+    private static final String MAIL_HOST = "imap.gmail.com";
+
+    @Scheduled(fixedDelay = 10000)
+    public void checkEmails() {
         Properties props = new Properties();
-        props.put("mail.store.protocol", "imaps");
+        props.put("mail.store.protocol", MAIL_PROTOCOL);
 
-        try{
+        Store store = null;
+        Folder inbox = null;
+
+        try {
             Session session = Session.getDefaultInstance(props, null);
-            Store store = session.getStore("imaps");
-            store.connect("imap.gmail.com", botMail , botMailPassword);
+            store = session.getStore(MAIL_PROTOCOL);
+            store.connect(MAIL_HOST, botMail, botMailPassword);
 
-            Folder inbox = store.getFolder("INBOX");
+            inbox = store.getFolder("INBOX");
             inbox.open(Folder.READ_WRITE);
 
             Message[] messages = inbox.search(new FlagTerm(new Flags(Flags.Flag.SEEN), false));
 
-            for(Message message: messages){
-                String sender = message.getFrom()[0].toString();
-
-                EmailContent content = parseMessageContent(message);
-
-
-                merchantService.proccessFromEmail(sender, content.bodyText, content.attachmentStream);
-                
-
-                message.setFlag(Flags.Flag.SEEN, true);
-
+            if (messages.length > 0) {
+                log.info("Found {} new emails to process", messages.length);
             }
-            
-            inbox.close(false);
-            store.close();
-        } catch (Exception e){
-            e.printStackTrace();
+
+            for (Message message : messages) {
+                try {
+                    String sender = message.getFrom()[0].toString();
+                    if (message.getFrom()[0] instanceof InternetAddress) {
+                        sender = ((InternetAddress) message.getFrom()[0]).getAddress();
+                    }
+
+                    EmailContent content = parseMessageContent(message);
+
+                    log.info("Processing email from: {}", sender);
+                    merchantService.proccessFromEmail(sender, content.bodyText, content.attachmentStream);
+
+                    message.setFlag(Flags.Flag.SEEN, true);
+
+                } catch (Exception e) {
+                    log.error("Error processing email from: " + message.getFrom()[0], e);
+                }
+            }
+
+        } catch (Exception e) {
+            log.error("Error connecting to email server", e);
+        } finally {
+            try {
+                if (inbox != null && inbox.isOpen()) inbox.close(false);
+                if (store != null && store.isConnected()) store.close();
+            } catch (Exception e) {
+                log.error("Error closing email resources", e);
+            }
         }
     }
 
     private EmailContent parseMessageContent(Message message) throws Exception {
-            EmailContent content = new EmailContent();
-            Object msgContent = message.getContent();
+        EmailContent content = new EmailContent();
+        Object msgContent = message.getContent();
 
-            if (msgContent instanceof MimeMultipart) {
-                extractMultipart((MimeMultipart) msgContent, content);
-            } else {
-                content.bodyText = message.getContent().toString();
-            }
-            return content;
+        if (msgContent instanceof MimeMultipart) {
+            extractMultipart((MimeMultipart) msgContent, content);
+        } else {
+            content.bodyText = message.getContent().toString();
+        }
+        return content;
     }
 
     private void extractMultipart(MimeMultipart multipart, EmailContent content) throws Exception {
-        for(int i = 0; i < multipart.getCount(); i++) {
+        for (int i = 0; i < multipart.getCount(); i++) {
             BodyPart bodyPart = multipart.getBodyPart(i);
 
-            if(Part.ATTACHMENT.equalsIgnoreCase(bodyPart.getDisposition()) && content.attachmentStream == null){
+            if (Part.ATTACHMENT.equalsIgnoreCase(bodyPart.getDisposition()) && content.attachmentStream == null) {
                 content.attachmentStream = bodyPart.getInputStream();
-            } 
-            else if (bodyPart.isMimeType("text/plain")) {
+            } else if (bodyPart.isMimeType("text/plain")) {
                 content.bodyText = bodyPart.getContent().toString();
-            }
-            else if (bodyPart.isMimeType("multipart/*")) {
+            } else if (bodyPart.isMimeType("multipart/*")) {
                 extractMultipart((MimeMultipart) bodyPart.getContent(), content);
             }
         }
     }
-
-
-    
-        
 }
