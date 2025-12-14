@@ -3,9 +3,9 @@ package com.hackathon.yuno.service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.hackathon.yuno.exceptions.MerchantNotFound;
 import com.hackathon.yuno.mapper.MerchantMapper;
@@ -15,6 +15,7 @@ import com.hackathon.yuno.model.dto.response.MerchantResponseDTO;
 import com.hackathon.yuno.model.entity.Interaction;
 import com.hackathon.yuno.model.entity.Merchant;
 import com.hackathon.yuno.model.entity.MerchantContext;
+import com.hackathon.yuno.model.enums.InteractionType;
 import com.hackathon.yuno.model.enums.LifeCicleState;
 import com.hackathon.yuno.model.enums.PaymentMethod;
 import com.hackathon.yuno.repository.InteractionRepository;
@@ -32,7 +33,30 @@ public class MerchantService {
     private final MerchantMapper merchantMapper;
     private final AIService aiService;
     private final InteractionRepository interactionRepository;
+    private final GladiaService gladiaService;
 
+
+    @Transactional
+    public MerchantResponseDTO ingestAudioData(MultipartFile audioFile, String merchantName, InteractionType type, String language) {
+        try {
+            log.info("Processing audio for merchant: {}", merchantName);
+            
+            String transcription = gladiaService.transcribeAudio(audioFile, language);
+            log.info("Audio transcribed successfully. Length: {} characters", transcription.length());
+            
+            IngestRequestDTO request = IngestRequestDTO.builder()
+                .content(transcription)
+                .type(type)
+                .merchantName(merchantName)
+                .build();
+            
+            return ingestData(request);
+            
+        } catch (Exception e) {
+            log.error("Error processing audio: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to process audio", e);
+        }
+    }
 
     @Transactional
     public MerchantResponseDTO ingestData(IngestRequestDTO request) {
