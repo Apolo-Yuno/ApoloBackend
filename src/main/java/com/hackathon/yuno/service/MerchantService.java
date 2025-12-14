@@ -41,7 +41,7 @@ public class MerchantService {
         try {
             log.info("Processing audio for merchant: {}", merchantName);
 
-            String transcription = gladiaService.transcribeAudio(audioFile, language);
+            String transcription = gladiaService.transcribeAudio(audioFile);
             log.info("Audio transcribed successfully. Length: {} characters", transcription.length());
 
             IngestRequestDTO request = IngestRequestDTO.builder()

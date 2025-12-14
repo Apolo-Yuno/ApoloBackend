@@ -11,8 +11,8 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -22,112 +22,97 @@ public class GladiaService {
     private final RestTemplate restTemplate;
 
     @Value("${gladia.api.key}")
-    private String gladiaApiKey;
+    private String apiKey;
 
-    private static final String GLADIA_API_URL = "https://api.gladia.io/v2/transcription";
+    private static final String BASE_URL = "https://api.gladia.io/v2";
 
-    private static final int MAX_POLLING_ATTEMPTS = 60;
+    public String transcribeAudio(MultipartFile file) throws Exception {
+        // 1. Subir Archivo
+        String audioUrl = uploadFile(file);
+        log.info("Audio subido a Gladia: {}", audioUrl);
 
-    private static final int POLLING_INTERVAL_SECONDS = 5;
+        // 2. Iniciar Transcripción
+        String transcriptionId = startTranscription(audioUrl);
+        log.info("Transcripción iniciada con ID: {}", transcriptionId);
 
-    public String transcribeAudio(MultipartFile audioFile, String language) {
-        try {
-            log.info("Starting Gladia transcription for file: {}", audioFile.getOriginalFilename());
-
-            String transcriptionId = uploadAudioFile(audioFile, language);
-            String transcription = pollForTranscription(transcriptionId);
-
-            log.info("Transcription completed. Length: {} characters", transcription.length());
-            return transcription;
-            
-        } catch (Exception e) {
-            log.error("Error transcribing audio: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to transcribe audio", e);
-        }
+        // 3. Esperar Resultado (Polling)
+        return pollForResults(transcriptionId);
     }
 
-    private String uploadAudioFile(MultipartFile audioFile, String language) throws Exception {
+    // --- PASO 1: SUBIR ARCHIVO ---
+    private String uploadFile(MultipartFile file) throws Exception {
         HttpHeaders headers = new HttpHeaders();
+        headers.set("x-gladia-key", apiKey);
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-        headers.set("x-gladia-key", gladiaApiKey);
-        
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        body.add("audio", new ByteArrayResource(audioFile.getBytes()) {
+
+        // Convertimos el MultipartFile a un recurso que RestTemplate entienda
+        ByteArrayResource fileResource = new ByteArrayResource(file.getBytes()) {
             @Override
             public String getFilename() {
-                return audioFile.getOriginalFilename();
+                return file.getOriginalFilename();
             }
-        });
-        
-        if (language != null && !language.isEmpty()) {
-            body.add("language", language);
-        }
-        
-        body.add("diarization", "false");
-        
+        };
+
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("audio", fileResource);
+
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
-        
-        log.debug("Uploading audio to Gladia...");
-        ResponseEntity<Map<String, Object>> response = restTemplate.postForEntity(
-            GLADIA_API_URL, requestEntity, 
-            (Class<Map<String, Object>>)(Class<?>)Map.class
-        );
-        
-        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-            String transcriptionId = (String) response.getBody().get("id");
-            log.info("Audio uploaded. Transcription ID: {}", transcriptionId);
-            return transcriptionId;
-        }
-        
-        throw new RuntimeException("Failed to upload audio to Gladia");
+
+        Map response = restTemplate.postForObject(BASE_URL + "/upload", requestEntity, Map.class);
+        return (String) response.get("audio_url");
     }
 
-    private String pollForTranscription(String transcriptionId) throws Exception {
+    // --- PASO 2: INICIAR TRANSCRIPCIÓN ---
+    private String startTranscription(String audioUrl) {
         HttpHeaders headers = new HttpHeaders();
-        headers.set("x-gladia-key", gladiaApiKey);
-        HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
-        
-        String statusUrl = GLADIA_API_URL + "/" + transcriptionId;
-        
-        for (int attempt = 0; attempt < MAX_POLLING_ATTEMPTS; attempt++) {
-            log.debug("Polling transcription status (attempt {}/{})", attempt + 1, MAX_POLLING_ATTEMPTS);
-            
-            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
-                statusUrl, 
-                HttpMethod.GET, 
-                requestEntity,
-                (Class<Map<String, Object>>)(Class<?>)Map.class
-            );
-            
-            Map<String, Object> body = response.getBody();
-            if (body == null) throw new RuntimeException("Null response from Gladia");
-            
-            String status = (String) body.get("status");
-            log.debug("Transcription status: {}", status);
-            
-            if ("done".equalsIgnoreCase(status)) {
-                return extractTranscription(body);
-            } else if ("error".equalsIgnoreCase(status)) {
-                throw new RuntimeException("Gladia transcription failed");
-            }
-            
-            TimeUnit.SECONDS.sleep(POLLING_INTERVAL_SECONDS);
-        }
-        
-        throw new RuntimeException("Transcription timeout");
+        headers.set("x-gladia-key", apiKey);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        // Configuramos Diarización (Detectar hablantes)
+        Map<String, Object> body = Map.of(
+                "audio_url", audioUrl,
+                "diarization", true // ¡Importante para saber quién es el cliente!
+        );
+
+        HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+        Map response = restTemplate.postForObject(BASE_URL + "/transcription", requestEntity, Map.class);
+        return (String) response.get("id");
     }
 
-    @SuppressWarnings("unchecked")
-    private String extractTranscription(Map<String, Object> response) {
-        Map<String, Object> result = (Map<String, Object>) response.get("result");
-        if (result == null) throw new RuntimeException("No transcription result");
-        
-        String transcription = (String) result.get("transcription");
-        
-        if (transcription == null || transcription.isEmpty()) {
-            throw new RuntimeException("Empty transcription result");
+    // --- PASO 3: POLLING (ESPERAR) ---
+    private String pollForResults(String id) throws Exception {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("x-gladia-key", apiKey);
+        HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+
+        String status = "queued";
+        Map response = null;
+
+        // Intentamos por 60 segundos máx (Hackathon mode)
+        for (int i = 0; i < 30; i++) {
+            Thread.sleep(2000); // Esperar 2 segundos
+
+            response = restTemplate.exchange(
+                    BASE_URL + "/transcription/" + id,
+                    HttpMethod.GET,
+                    requestEntity,
+                    Map.class).getBody();
+
+            status = (String) response.get("status");
+            log.info("Estado transcripción: {}", status);
+
+            if ("done".equals(status)) {
+                break;
+            }
         }
-        
-        return transcription.trim();
+
+        if (!"done".equals(status)) {
+            throw new RuntimeException("Tiempo de espera agotado para transcripción");
+        }
+
+        // Extraer el texto completo
+        Map result = (Map) response.get("result");
+        Map transcription = (Map) result.get("transcription");
+        return (String) transcription.get("full_transcript");
     }
 }

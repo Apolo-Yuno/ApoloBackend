@@ -9,6 +9,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.hackathon.yuno.model.dto.request.IngestRequestDTO;
 import com.hackathon.yuno.model.dto.response.MerchantResponseDTO;
 import com.hackathon.yuno.model.enums.InteractionType;
+import com.hackathon.yuno.service.GladiaService;
 import com.hackathon.yuno.service.MerchantService;
 
 import lombok.RequiredArgsConstructor;
@@ -21,33 +22,29 @@ import lombok.extern.slf4j.Slf4j;
 public class MerchantController {
 
     private final MerchantService merchantService;
+    private final GladiaService gladiaService;
 
     @PostMapping("/ingest")
     public ResponseEntity<MerchantResponseDTO> ingestData(@RequestBody IngestRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(merchantService.ingestData(request));
     }
 
-    @PostMapping(value = "/ingest/audio", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<MerchantResponseDTO> ingestAudioData(
-            @RequestParam("audio") MultipartFile audioFile,
-            @RequestParam("merchantName") String merchantName,
-            @RequestParam(value = "type", defaultValue = "CALL") InteractionType type,
-            @RequestParam(value = "language", defaultValue = "es") String language) {
-        
-        log.info("Received audio ingestion request for merchant: {}", merchantName);
-        
-        if (audioFile.isEmpty()) {
-            log.warn("Empty audio file received");
-            return ResponseEntity.badRequest().build();
+    @PostMapping(value = "/upload-audio", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public MerchantResponseDTO uploadAudio(@RequestParam("file") MultipartFile file) {
+        try {
+            String transcript = gladiaService.transcribeAudio(file);
+
+            IngestRequestDTO request = IngestRequestDTO.builder()
+                    .content(transcript)
+                    .type(InteractionType.CALL)
+                    .merchantName(null)
+                    .build();
+
+            return merchantService.ingestData(request);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Error procesando audio: " + e.getMessage());
         }
-        
-        log.info("Processing audio file: {} (size: {} KB)", 
-                audioFile.getOriginalFilename(), 
-                audioFile.getSize() / 1024);
-        
-        MerchantResponseDTO response = merchantService.ingestAudioData(audioFile, merchantName, type, language);
-        
-        log.info("Audio processed successfully for merchant: {}", merchantName);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
-} 
+}
