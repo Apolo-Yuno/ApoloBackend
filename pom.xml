@@ -99,6 +99,26 @@
 			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
 
+		<!-- Slack Bolt for Java -->
+		<dependency>
+			<groupId>com.slack.api</groupId>
+			<artifactId>bolt</artifactId>
+			<version>1.38.0</version>
+		</dependency>
+
+		<dependency>
+			<groupId>com.slack.api</groupId>
+			<artifactId>bolt-socket-mode</artifactId>
+			<version>1.38.0</version>
+		</dependency>
+
+		<!-- DotEnv para cargar variables de entorno -->
+		<dependency>
+			<groupId>io.github.cdimascio</groupId>
+			<artifactId>dotenv-java</artifactId>
+			<version>3.0.0</version>
+		</dependency>
+
 	</dependencies>
 
 	<build>
