@@ -18,24 +18,36 @@
 This section illustrates the system architecture. The images are stored in `docs/diagrams/`.
 
 ### 🧩 General Component Diagram
-High-level view of system components and integrations (Frontend, API, AI Services, DB, External APIs).
 
 ![General Component Diagram](docs/DiagramaDeArquitecturaGeneral.png)
 
+This high-level architecture diagram outlines the core components of our solution. We leverage external APIs for AI capabilities and integrations with platforms such as Slack and email. A non-relational database is utilized to efficiently handle high data volumes and flexible data structures.
+
 ### ⚙️ Specific Component Diagram
-Detailed backend components: Controllers, Services (`AIService`, `GladiaService`), Repositories, and Mappers.
 
 ![Specific Component Diagram](docs/DiagramaDeComponentesEspecifico.png)
 
+This diagram details the specific services involved in the implementation. The central component is the Merchant Service, which orchestrates merchant creation, manages interactions, and coordinates calls to AI services.
+
 ### 🗄️ Database Model
-Database schema showing the `Merchant`, `Interaction`, and `RiskProfile` entities and their relationships.
+
 
 ![Database Diagram](docs/DiagramaBaseDeDatos.png)
 
+Our data model is implemented using MongoDB to handle document-based storage. We utilize a combination of embedded and referenced documents to optimize performance and data integrity:
+
+*   **Embedded:** Merchant Context
+*   **Referenced:** Interactions
+
 ### 📦 Class Diagram
-Important domain classes (Entities, Enums and  Pattern Designs) and their relationships.
 
 ![Class Diagram](docs/DiagramaDeClases.png)
+
+The class diagram illustrates the relationships between entities, enumerations, and the design patterns applied:
+
+- **Builder Pattern:** Used for constructing complex objects like `Merchant`, `MerchantContext`, and `Interactions`, allowing for flexible object creation with varying attributes.
+
+- **Facade Pattern:** Implemented to simplify file format conversions, providing a unified interface to delegate tasks to specific implementation classes.
 
 ---
 
