@@ -1,5 +1,6 @@
 package com.hackathon.yuno.service;
 
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 
@@ -7,7 +8,6 @@ import java.util.ArrayList;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.hackathon.yuno.exceptions.MerchantNotFound;
 import com.hackathon.yuno.mapper.MerchantMapper;
 import com.hackathon.yuno.model.dto.ai.AIAnalysisResult;
 import com.hackathon.yuno.model.dto.request.IngestRequestDTO;
@@ -15,6 +15,7 @@ import com.hackathon.yuno.model.dto.response.MerchantResponseDTO;
 import com.hackathon.yuno.model.entity.Interaction;
 import com.hackathon.yuno.model.entity.Merchant;
 import com.hackathon.yuno.model.entity.MerchantContext;
+import com.hackathon.yuno.model.enums.InteractionType;
 import com.hackathon.yuno.model.enums.LifeCicleState;
 import com.hackathon.yuno.model.enums.PaymentMethod;
 import com.hackathon.yuno.repository.InteractionRepository;
@@ -32,7 +33,7 @@ public class MerchantService {
     private final MerchantMapper merchantMapper;
     private final AIService aiService;
     private final InteractionRepository interactionRepository;
-
+    private final DocumentAnalizerService documentAnalizerService;
 
     @Transactional
     public MerchantResponseDTO ingestData(IngestRequestDTO request) {
@@ -134,5 +135,28 @@ public class MerchantService {
         if (aiData.getSummary() != null) {
             context.setLastSummary(aiData.getSummary());
         }
+    }
+
+    @Transactional
+    public MerchantResponseDTO proccessFromEmail(String senderEmail, String emailBody, InputStream attachmentStream){
+        
+        StringBuilder fullContent = new StringBuilder();
+        fullContent.append("EMAIL SENDER: ").append(senderEmail).append("\n");
+        fullContent.append("EMAIL BODY: \n").append(emailBody).append("\n");
+
+        if(attachmentStream != null){
+            String pdfText = documentAnalizerService.extractTextFromPDFStream(attachmentStream);
+            if(!pdfText.isEmpty()){
+                fullContent.append("\nATTACHMENT CONTENT: \n").append(pdfText);
+            }
+        }
+
+        IngestRequestDTO request = IngestRequestDTO.builder()
+            .content(fullContent.toString())
+            .type(InteractionType.EMAIL)
+            .merchantName(null)
+            .build();
+
+        return ingestData(request);
     }
 }
