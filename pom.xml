@@ -119,6 +119,20 @@
 			<version>3.0.0</version>
 		</dependency>
 
+		<!-- WebSocket API para Slack Socket Mode -->
+		<dependency>
+			<groupId>javax.websocket</groupId>
+			<artifactId>javax.websocket-api</artifactId>
+			<version>1.1</version>
+		</dependency>
+
+		<!-- WebSocket implementation (Tyrus) -->
+		<dependency>
+			<groupId>org.glassfish.tyrus</groupId>
+			<artifactId>tyrus-container-grizzly-client</artifactId>
+			<version>1.21</version>
+		</dependency>
+
 	</dependencies>
 
 	<build>
